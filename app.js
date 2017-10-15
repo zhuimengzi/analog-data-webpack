@@ -36,7 +36,7 @@ let socket = null;
 
 const app = new Koa();
 
-app.use(static(__dirname));
+app.use(static(path.resolve('.')));
 
 app.use(webpackMiddleware({
     config: webpackConfig,
@@ -323,5 +323,6 @@ io.on('connection', function (skt) {
 });
 
 server.listen(port, () => {
-    console.log(`See request info => http://localhost:${port}`);
+    console.log(`server => http://localhost:${port}`);
+    console.log(`See request info => http://localhost:${port}/debug`);
 });

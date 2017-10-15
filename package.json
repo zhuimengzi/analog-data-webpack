@@ -1,6 +1,6 @@
 {
-  "name": "analog-data",
-  "version": "3.0.2",
+  "name": "analog-data-webpack",
+  "version": "1.0.1",
   "description": "请求拦截,模拟后端数据",
   "main": "app.js",
   "scripts": {
