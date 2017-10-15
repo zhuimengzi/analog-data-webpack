@@ -10,20 +10,18 @@ const urlTo = require('url');
 const querystring = require('querystring');
 
 let port = process.argv[2];
-let webpackPath = process.argv[3];
-let apiPath = process.argv[4];
+let apiPath = process.argv[3];
+let webpackPath = process.argv[4];
 if (isNaN(port)) {
-    apiPath = webpackPath;
-    webpackPath = port;
+    webpackPath = apiPath;
+    apiPath = port;
     port = 9870;
 }
-webpackPath = webpackPath || 'webpack.dev.config.js';
+webpackPath = `${path.resolve('.')}/${webpackPath || 'webpack.dev.config.js'}`;
 apiPath = apiPath || 'api.js';
 
 const Koa = require('koa2');
-const webpackMiddleware = require('koa-webpack');
 const static = require('koa-static');
-const webpackConfig = require(`${path.resolve('.')}/${webpackPath}`);
 const multiparty = require('multiparty');
 const prettyHtml = require('json-pretty-html').default;
 
@@ -34,77 +32,14 @@ const Mock = require('mockjs');
 
 let socket = null;
 
-const app = new Koa();
-
-app.use(static(path.resolve('.')));
-
-app.use(webpackMiddleware({
-    config: webpackConfig,
-    dev: {
-        publicPath: webpackConfig.output.publicPath,
-        noInfo: true
-    }
-}));
-
-app.use(function *(next) {
-    let req = this.req;
-    let res = this.res;
-    let koaReq = this.request;
-    let koaRes = this.response;
-    let reqUrl = `http://${koaReq.header.host}${koaReq.url}`;
-
-    req.reqUrl = reqUrl;
-
-    if (openCross(koaReq, koaRes) || openTestView(koaReq, koaRes)) {
+let fsExistsSync = path => {
+    try{
+        fs.accessSync(path,fs.F_OK);
+    }catch(e){
         return false;
     }
-    else if (-1 !== req.url.indexOf('socket.io')) {
-    }
-    else {
-        let url = urlTo.parse(reqUrl);
-        let regPathResult = null;
-        let resultData = {
-            req: req,
-            postData: null,
-            formData: null,
-            res: null
-        };
-
-        // 获取请求数据
-        yield getData(req).then(data => {
-            resultData.postData = data.postData;
-            resultData.formData = data.formData;
-        }).then(async () => {
-            if ((regPathResult = regPath(apiRequest, url.pathname)) && false !== apiConfig.open) {
-                results.add(resultData);
-                koaRes.body = requestLocalData(regPathResult.data);
-            }
-            else {
-                // 处理url
-                let serverUrl = '';
-                if (apiConfig.testServer) {
-                    if ('/' === apiConfig.testServer.slice(-1)) {
-                        apiConfig.testServer = apiConfig.testServer.slice(0, -1);
-                    }
-
-                    serverUrl = [apiConfig.testServer, url.path].join('');
-                }
-                else {
-                    serverUrl = reqUrl;
-                }
-
-                req.reqUrl = serverUrl;
-                koaRes.body = await requestServer(serverUrl, req).then(res => {
-                    resultData.res = res;
-                    results.add(resultData);
-                    emitData();
-
-                    return res;
-                });
-            }
-        });
-    }
-});
+    return true;
+};
 
 // emitData
 let emitData = () => {
@@ -309,6 +244,82 @@ let requestServer = (url, req) => {
         req.pipe(serverReq);
     });
 };
+
+const app = new Koa();
+
+app.use(static(path.resolve('.')));
+
+if (fsExistsSync(webpackPath)) {
+    let webpackConfig = require(webpackPath);
+    let webpackMiddleware = require('koa-webpack');
+    app.use(webpackMiddleware({
+        config: webpackConfig,
+        dev: {
+            publicPath: webpackConfig.output.publicPath,
+            noInfo: true
+        }
+    }));
+}
+
+app.use(function *(next) {
+    let req = this.req;
+    let res = this.res;
+    let koaReq = this.request;
+    let koaRes = this.response;
+    let reqUrl = `http://${koaReq.header.host}${koaReq.url}`;
+
+    req.reqUrl = reqUrl;
+
+    if (openCross(koaReq, koaRes) || openTestView(koaReq, koaRes)) {
+        return false;
+    }
+    else if (-1 !== req.url.indexOf('socket.io')) {
+    }
+    else {
+        let url = urlTo.parse(reqUrl);
+        let regPathResult = null;
+        let resultData = {
+            req: req,
+            postData: null,
+            formData: null,
+            res: null
+        };
+
+        // 获取请求数据
+        yield getData(req).then(data => {
+            resultData.postData = data.postData;
+            resultData.formData = data.formData;
+        }).then(async () => {
+            if ((regPathResult = regPath(apiRequest, url.pathname)) && false !== apiConfig.open) {
+                results.add(resultData);
+                koaRes.body = requestLocalData(regPathResult.data);
+            }
+            else {
+                // 处理url
+                let serverUrl = '';
+                if (apiConfig.testServer) {
+                    if ('/' === apiConfig.testServer.slice(-1)) {
+                        apiConfig.testServer = apiConfig.testServer.slice(0, -1);
+                    }
+
+                    serverUrl = [apiConfig.testServer, url.path].join('');
+                }
+                else {
+                    serverUrl = reqUrl;
+                }
+
+                req.reqUrl = serverUrl;
+                koaRes.body = await requestServer(serverUrl, req).then(res => {
+                    resultData.res = res;
+                    results.add(resultData);
+                    emitData();
+
+                    return res;
+                });
+            }
+        });
+    }
+});
 
 // 服务
 let server = http.createServer(app.callback());
