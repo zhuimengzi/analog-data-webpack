@@ -136,6 +136,7 @@ let regPath = (apiRequest, pathname) => {
         if (apiRequest.hasOwnProperty(k)) {
             if (regResult = pathname.match(new RegExp(k))) {
                 result = {
+                    name: k,
                     data: apiRequest[k],
                     regResult: regResult
                 };
@@ -180,7 +181,6 @@ let requestLocalData = regItem => {
 
     resData.resultData = toHtml(data);
     resData.resultData.test = true;
-    emitData();
     return data;
 };
 
@@ -290,9 +290,11 @@ app.use(function *(next) {
             resultData.postData = data.postData;
             resultData.formData = data.formData;
         }).then(async () => {
+            let data = '';
+
             if ((regPathResult = regPath(apiRequest, url.pathname)) && false !== apiConfig.open) {
                 results.add(resultData);
-                koaRes.body = requestLocalData(regPathResult.data);
+                data = requestLocalData(regPathResult.data);
             }
             else {
                 // 处理url
@@ -309,14 +311,36 @@ app.use(function *(next) {
                 }
 
                 req.reqUrl = serverUrl;
-                koaRes.body = await requestServer(serverUrl, req).then(res => {
+                data = await requestServer(serverUrl, req).then(res => {
                     resultData.res = res;
                     results.add(resultData);
-                    emitData();
 
                     return res;
                 });
             }
+
+            // 延时返回
+            await new Promise(resolve => {
+                let delay = Math.random() * 2 * 800;
+                if (apiConfig.delay) {
+                    if ('function' === typeof apiConfig.delay) {
+                        delay = apiConfig.delay();
+                    }
+                    else {
+                        delay = apiConfig.delay;
+                    }
+                }
+
+                setTimeout(
+                    () => {
+                        resolve();
+                    },
+                    delay
+                );
+            }).then(() => {
+                koaRes.body = data;
+                emitData();
+            });
         });
     }
 });
