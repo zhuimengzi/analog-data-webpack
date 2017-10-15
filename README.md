@@ -26,9 +26,15 @@ api.js
 module.exports = {
     config: {
       // cookie
-      'cookie': '',
-      // 控制总开关, 默认为true
-      'open': true,
+      cookie: '',
+      // 是否将请求转发到本地, 默认为true, 如果打开了此选项但由于本地没有匹配到数据,则还是会去请求服务器上的数据
+      open: true,
+      // 延时返回,不设置则使用默认
+	  delay: () => {
+		return Math.random() * 2 * 10000
+	  },
+	  // 需要转发到的服务器地址和端口
+	  testServer: 'http://www.xx.com:808',
     },
     request: {
       // 可以返回一个函数,字符串,数字,数组, 如果返回的是"数据对象",那么里面不能出现ok,active字段,否则会被当做是一个配置项从而报错
@@ -36,7 +42,7 @@ module.exports = {
       '/api/queryUserInfo': function(Mock, postData, formData) {
             let result = null;
 
-            switch (data.id) {
+            switch (postData.id) {
                 case 0:
                     result = {
                    		status: 'ok',
@@ -54,12 +60,8 @@ module.exports = {
             return result;
        },
       '/test': {
-          // 是否拦截本条请求,默认为true
-          open: false,
           // 使用哪个项作为返回的结果, 默认返回ok项
           active: 'test',
-          // 延时返回
-          delay: 1000,
           test: function(Mock, postData, formData) {
               return Mock.mock({
                   'data|0-10': [{
@@ -91,7 +93,6 @@ module.exports = {
 ```
 
 上下文
----
 
 this.requestInfo: url,method信息
 
